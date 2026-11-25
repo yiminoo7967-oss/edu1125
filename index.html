@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>출장여비 계산기</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="xlsx.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="shell masthead-inner">
+      <p class="context">국내 출장</p>
+      <h1>출장여비 계산기</h1>
+      <p class="intro">출장 날짜와 교통편을 입력하고 예상 지급액을 확인하세요.</p>
+      <div class="music-controls" role="group" aria-label="크리스마스 배경음악">
+        <button id="music-play" type="button" class="music-play"><span aria-hidden="true">▶</span> 음악 재생</button>
+        <button id="music-stop" type="button" class="music-stop" disabled><span aria-hidden="true">■</span> 음악 정지</button>
+        <p id="music-status" class="music-status" role="status">징글벨</p>
+      </div>
+      <audio id="carol" src="jingle-bells.wav" preload="none" loop></audio>
+      <div class="ornaments" aria-hidden="true">
+        <span class="ornament ornament-gold"></span>
+        <span class="ornament ornament-red"></span>
+        <span class="ornament ornament-green"></span>
+      </div>
+    </div>
+    <div class="santa-track" aria-hidden="true">
+      <span class="santa-flight"><span class="santa-trail">✧</span><span class="santa-rider">🎅</span><span class="santa-sleigh"></span></span>
+    </div>
+  </header>
+
+  <main class="shell layout">
+    <form id="trip-form" novalidate>
+      <section class="card" aria-labelledby="trip-title">
+        <h2 id="trip-title">출장 정보</h2>
+        <fieldset>
+          <legend>출장 유형</legend>
+          <div class="segments">
+            <label><input name="trip-type" type="radio" value="outside" checked><span>근무지 밖</span></label>
+            <label><input name="trip-type" type="radio" value="inside"><span>근무지 내</span></label>
+          </div>
+          <p class="hint">같은 시·군·섬 안에서 가거나 여행거리가 12km 미만이면 근무지 내 출장에 해당합니다. 통합특별시에는 별도 기준이 있습니다.</p>
+        </fieldset>
+        <div class="grid">
+          <label for="departure">출발일<input id="departure" type="date" required></label>
+          <label for="return-date">복귀일<input id="return-date" type="date" required aria-describedby="date-error"></label>
+        </div>
+        <p id="date-error" class="error" hidden></p>
+        <p id="duration" class="status" role="status" hidden></p>
+        <button type="button" id="next" class="primary">다음 · 교통편 입력</button>
+      </section>
+
+      <section id="details" class="card" aria-labelledby="details-title" hidden>
+        <h2 id="details-title" tabindex="-1">교통편 및 지급 조건</h2>
+        <div id="inside-fields" hidden>
+          <div class="grid">
+            <label for="start-time">출발 시각<input id="start-time" type="time" required></label>
+            <label for="end-time">복귀 시각<input id="end-time" type="time" required></label>
+          </div>
+          <label for="inside-vehicle">차량 이용 구분
+            <select id="inside-vehicle">
+              <option value="standard">일반</option>
+              <option value="official">공무용 차량 이용 등 감액 대상</option>
+              <option value="assigned">전용 차량 배정자</option>
+            </select>
+          </label>
+          <p id="inside-duration" class="hint" role="status" hidden></p>
+        </div>
+
+        <div id="outside-fields">
+          <div class="grid">
+            <label for="grade">여비 지급 구분
+              <select id="grade">
+                <option value="second">제2호</option>
+                <option value="first">제1호</option>
+              </select>
+            </label>
+            <label for="transport">주 교통수단
+              <select id="transport">
+                <option value="car">자가용</option>
+                <option value="train">철도</option>
+                <option value="bus">버스</option>
+                <option value="air">항공</option>
+                <option value="ship">선박</option>
+                <option value="official">공용 교통수단만 이용</option>
+              </select>
+            </label>
+          </div>
+          <div id="car-fields">
+            <label class="check"><input id="necessary-car" type="checkbox">공무상 부득이한 자가용 이용에 해당</label>
+            <div id="reference-fields">
+              <label for="reference-transport">기준 교통편
+                <select id="reference-transport" required>
+                  <option value="">선택하세요</option>
+                  <option value="train">철도</option>
+                  <option value="bus">버스</option>
+                </select>
+              </label>
+            </div>
+            <div id="recognized-fields" hidden>
+              <div class="grid">
+                <label for="fuel">인정 연료비 (원)<input id="fuel" type="number" min="0" max="999999999" step="1" inputmode="numeric" placeholder="예: 18000" required></label>
+                <label for="toll">인정 통행료 (원)<input id="toll" type="number" min="0" max="999999999" step="1" inputmode="numeric" value="0" required></label>
+              </div>
+              <p class="hint">기관의 지급 기준으로 확인한 금액을 입력하세요.</p>
+            </div>
+          </div>
+          <div id="fare-fields">
+            <label for="fare"><span id="fare-label">왕복 기준 운임 (원)</span><input id="fare" type="number" min="0" max="999999999" step="1" inputmode="numeric" placeholder="예: 24000" aria-describedby="fare-hint" required></label>
+            <p id="fare-hint" class="hint">가는 편과 오는 편의 운임을 합해 입력하세요.</p>
+          </div>
+          <p id="official-fare-hint" class="hint" hidden>공용 교통수단을 이용한 구간에는 운임을 지급하지 않습니다.</p>
+          <label for="reduced-days">일비 반액 적용 일수
+            <input id="reduced-days" type="number" min="0" step="1" inputmode="numeric" value="0" required aria-describedby="reduced-hint">
+          </label>
+          <p id="reduced-hint" class="hint">공무용 차량 이용 등 일비 반액 지급 대상인 일수를 입력하세요.</p>
+          <div id="special-transport" hidden>
+            <label for="meal-days">식비 지급 대상 일수
+              <input id="meal-days" type="number" min="0" step="1" inputmode="numeric" required aria-describedby="meal-hint">
+            </label>
+            <p id="meal-hint" class="hint">항공·수로여행 중 따로 식비가 필요한 날과 일반 식비 지급 대상인 날을 합산하세요.</p>
+            <label id="mileage-field" class="check"><input id="mileage" type="checkbox">공적 항공마일리지로 항공운임 절약</label>
+          </div>
+          <div id="lodging-fields" class="subsection" hidden>
+            <label class="check"><input id="lodging" type="checkbox">지급 대상 숙박이 있습니다</label>
+            <p id="lodging-travel-hint" class="hint" hidden>항공·수로여행에는 천재지변 등 부득이한 사유로 필요한 육지 숙박비를 지급할 수 있습니다. 지급 대상인 숙박만 입력하세요.</p>
+            <div id="lodging-editor" hidden>
+              <div id="nights"></div>
+              <button id="add-night" type="button" class="secondary">숙박 추가</button>
+              <p class="hint">실제 숙박한 밤마다 지역과 결제액을 입력하세요.</p>
+            </div>
+          </div>
+        </div>
+        <p id="form-error" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button type="submit" class="primary">여비 계산</button>
+          <button type="reset" class="secondary">초기화</button>
+        </div>
+      </section>
+    </form>
+
+    <aside class="result" aria-labelledby="result-title">
+      <p class="print-title">출장여비 계산 내역</p>
+      <h2 id="result-title" tabindex="-1">예상 지급액</h2>
+      <div id="result-output" aria-live="polite">
+        <p id="total" class="total">—</p>
+        <p id="result-context" class="result-context">출장 조건을 입력하고 여비를 계산하세요.</p>
+        <p id="result-dates" class="result-context" hidden></p>
+        <dl id="breakdown" class="breakdown" hidden></dl>
+        <ul id="result-notes" class="notes" hidden></ul>
+      </div>
+      <div id="result-actions" class="actions" hidden>
+        <button id="print-result" type="button" class="secondary">결과 인쇄</button>
+        <button id="save-excel" type="button" class="secondary">엑셀로 저장</button>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="shell footer">제공된 공무원 여비 규정(2026. 10. 2. 시행) 제15조~제18조 및 별표 2 기준</footer>
+
+  <template id="night-template">
+    <fieldset class="night">
+      <legend>숙박</legend>
+      <div class="grid">
+        <label>숙박 지역
+          <select class="night-region">
+            <option value="">선택하세요</option>
+            <option value="seoul">서울특별시</option>
+            <option value="metro">광역시</option>
+            <option value="other">그 밖의 지역</option>
+          </select>
+        </label>
+        <label>1박 결제액 (원)<input class="night-cost" type="number" min="0" max="999999999" step="1" inputmode="numeric" required></label>
+      </div>
+      <label class="check night-extra-label"><input type="checkbox" class="night-extra">부득이한 상한 초과 지출로 추가 지급 요건에 해당</label>
+      <button type="button" class="secondary remove-night">이 숙박 삭제</button>
+    </fieldset>
+  </template>
+</body>
+</html>
